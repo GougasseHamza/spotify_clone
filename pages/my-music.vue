@@ -1,0 +1,142 @@
+<template>
+  <div class="my-music-page">
+    <h1 class="mb-4">My Music</h1>
+    
+    <div v-if="isLoading" class="text-center py-5">
+      <div class="spinner-border text-success" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-3">Loading your music...</p>
+    </div>
+    
+    <div v-else>
+      <!-- Top Artists -->
+      <section class="mb-5">
+        <h2 class="mb-3">Your Top Artists</h2>
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-4">
+          <div v-for="artist in topArtists" :key="artist.id" class="col">
+            <div class="card bg-dark h-100">
+              <img :src="artist.images[0]?.url || '/img/placeholder-artist.png'" class="card-img-top" :alt="artist.name">
+              <div class="card-body">
+                <h5 class="card-title">{{ artist.name }}</h5>
+                <p class="card-text text-muted">Artist</p>
+              </div>
+            </div>
+          </div>
+          <div v-if="topArtists.length === 0" class="col-12">
+            <div class="alert alert-dark">
+              <p class="mb-0">Connect your Spotify account to see your top artists.</p>
+              <button @click="connectSpotify" class="btn btn-success mt-3">
+                <i class="bi bi-spotify me-2"></i> Connect to Spotify
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Recently Played -->
+      <section class="mb-5">
+        <h2 class="mb-3">Recently Played</h2>
+        <div class="row">
+          <div v-for="track in recentlyPlayed" :key="track.played_at" class="col-12 mb-2">
+            <div class="d-flex align-items-center p-2 rounded hover-bg-dark">
+              <img :src="track.track.album.images[0]?.url || '/img/placeholder-album.png'" 
+                  class="me-3" width="48" height="48" :alt="track.track.name">
+              <div class="flex-grow-1">
+                <div class="track-name">{{ track.track.name }}</div>
+                <div class="artist-name text-muted">{{ track.track.artists.map(a => a.name).join(', ') }}</div>
+              </div>
+              <div class="text-muted small">{{ formatDate(track.played_at) }}</div>
+            </div>
+          </div>
+          <div v-if="recentlyPlayed.length === 0" class="col-12">
+            <div class="alert alert-dark">
+              <p class="mb-0">Connect your Spotify account to see your recently played tracks.</p>
+              <button @click="connectSpotify" class="btn btn-success mt-3">
+                <i class="bi bi-spotify me-2"></i> Connect to Spotify
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+
+// Add auth middleware to protect this route
+definePageMeta({
+  middleware: ['auth']
+})
+
+const { getMyTopArtists, getMyRecentlyPlayed, login } = useSpotify()
+const { user, isAuthenticated } = useAuth()
+const isLoading = ref(true)
+const topArtists = ref([])
+const recentlyPlayed = ref([])
+
+onMounted(async () => {
+  console.log('My Music Page - Auth State:', { 
+    user: user.value, 
+    isAuthenticated: isAuthenticated.value 
+  })
+  
+  try {
+    isLoading.value = true
+    
+    // Try to load Spotify data
+    const [artistsData, recentlyPlayedData] = await Promise.allSettled([
+      getMyTopArtists(),
+      getMyRecentlyPlayed()
+    ])
+    
+    if (artistsData.status === 'fulfilled') {
+      topArtists.value = artistsData.value
+    }
+    
+    if (recentlyPlayedData.status === 'fulfilled') {
+      recentlyPlayed.value = recentlyPlayedData.value
+    }
+  } catch (error) {
+    console.error('Error loading music data:', error)
+  } finally {
+    isLoading.value = false
+  }
+})
+
+// Format date to relative time (e.g., "2 hours ago")
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffInMs = now.getTime() - date.getTime()
+  
+  const diffInMinutes = Math.floor(diffInMs / 60000)
+  const diffInHours = Math.floor(diffInMinutes / 60)
+  const diffInDays = Math.floor(diffInHours / 24)
+  
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`
+  } else if (diffInHours < 24) {
+    return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`
+  } else {
+    return `${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`
+  }
+}
+
+// Connect to Spotify
+const connectSpotify = () => {
+  login()
+}
+</script>
+
+<style scoped>
+.my-music-page {
+  padding: 1rem;
+}
+
+.hover-bg-dark:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+</style> 

@@ -17,11 +17,21 @@ export const useAuth = () => {
   const user = ref<User | null>(null)
   const isAuthenticated = computed(() => !!user.value)
   const isLoading = ref(false)
+  const authInitialized = ref(false)
 
   // Initialize user on auth state change
   if (process.client) {
-    onAuthStateChanged(auth, (userData) => {
+    const unsubscribe = onAuthStateChanged(auth, (userData) => {
       user.value = userData
+      authInitialized.value = true
+      console.log('Auth State Changed:', { 
+        user: userData ? { 
+          uid: userData.uid, 
+          email: userData.email,
+          displayName: userData.displayName
+        } : null, 
+        isAuthenticated: !!userData 
+      })
     })
   }
 
@@ -164,6 +174,7 @@ export const useAuth = () => {
     user,
     isAuthenticated,
     isLoading,
+    authInitialized,
     registerWithEmail,
     loginWithEmail,
     loginWithGoogle,

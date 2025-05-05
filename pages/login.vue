@@ -108,11 +108,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
-const { loginWithGoogle, loginWithEmail, registerWithEmail } = useAuth()
+const route = useRoute()
+const { loginWithGoogle, loginWithEmail, registerWithEmail, isAuthenticated } = useAuth()
 
 const email = ref('')
 const password = ref('')
@@ -120,11 +121,34 @@ const confirmPassword = ref('')
 const errorMessage = ref('')
 const isRegistering = ref(false)
 
+// Redirect if already authenticated
+onMounted(() => {
+  if (isAuthenticated.value) {
+    router.push('/')
+  }
+  
+  // Check if register parameter is present in the URL
+  if (route.query.register) {
+    isRegistering.value = true
+  }
+})
+
+// Handle redirection after successful login
+const redirectAfterLogin = () => {
+  // Check if there's a redirect path in the query parameters
+  const redirectPath = route.query.redirect as string
+  if (redirectPath) {
+    router.push(redirectPath)
+  } else {
+    router.push('/')
+  }
+}
+
 const handleGoogleLogin = async () => {
   try {
     errorMessage.value = ''
     await loginWithGoogle()
-    router.push('/')
+    redirectAfterLogin()
   } catch (error: any) {
     errorMessage.value = error.message || 'Failed to login with Google'
   }
@@ -134,7 +158,7 @@ const handleEmailLogin = async () => {
   try {
     errorMessage.value = ''
     await loginWithEmail(email.value, password.value)
-    router.push('/')
+    redirectAfterLogin()
   } catch (error: any) {
     errorMessage.value = error.message || 'Failed to login'
   }
@@ -150,7 +174,7 @@ const handleRegister = async () => {
     }
     
     await registerWithEmail(email.value, password.value)
-    router.push('/')
+    redirectAfterLogin()
   } catch (error: any) {
     errorMessage.value = error.message || 'Failed to register'
   }

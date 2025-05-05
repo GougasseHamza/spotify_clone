@@ -19,6 +19,11 @@
               <i class="bi bi-search me-3"></i> Search
             </NuxtLink>
           </li>
+          <li class="nav-item" v-if="isAuthenticated">
+            <NuxtLink to="/my-music" class="nav-link text-white d-flex align-items-center">
+              <i class="bi bi-music-note-list me-3"></i> My Music
+            </NuxtLink>
+          </li>
         </ul>
       </div>
 
@@ -83,9 +88,12 @@
             <button class="btn btn-dark rounded-circle">
               <i class="bi bi-bell"></i>
             </button>
-            <NuxtLink v-if="!user" to="/login" class="btn btn-light rounded-pill px-4">Log in</NuxtLink>
+            <div v-if="!user" class="d-flex gap-2">
+              <NuxtLink to="/login" class="btn btn-light rounded-pill px-4">Log in</NuxtLink>
+              <NuxtLink to="/login?register=true" class="btn btn-outline-light rounded-pill px-4">Sign up</NuxtLink>
+            </div>
             <div v-else class="d-flex align-items-center">
-              <div class="dropdown">
+              <div class="dropdown me-2">
                 <button class="btn btn-dark rounded-circle dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                   <img v-if="user?.photoURL" :src="user.photoURL" :alt="user?.displayName || 'User'" 
                       class="rounded-circle" width="32" height="32">
@@ -95,9 +103,17 @@
                   <li class="dropdown-item-text text-white">{{ user?.displayName || user?.email?.split('@')[0] }}</li>
                   <li><hr class="dropdown-divider"></li>
                   <li><NuxtLink to="/profile" class="dropdown-item">Profile</NuxtLink></li>
-                  <li><a href="#" class="dropdown-item" @click.prevent="logout">Log out</a></li>
+                  <li><NuxtLink to="/debug-auth" class="dropdown-item">Debug Auth</NuxtLink></li>
+                  <li><NuxtLink to="/logout" class="dropdown-item">
+                    <span class="text-danger"><i class="bi bi-box-arrow-right me-2"></i>Log out</span>
+                  </NuxtLink></li>
                 </ul>
               </div>
+              
+              <!-- Direct Logout Button -->
+              <NuxtLink to="/logout" class="btn btn-outline-danger rounded-pill">
+                <i class="bi bi-box-arrow-right me-1"></i> Log out
+              </NuxtLink>
             </div>
           </div>
         </div>
@@ -105,6 +121,10 @@
 
       <!-- Page Content -->
       <div class="content-area">
+        <div v-if="user && $route.path === '/'" class="welcome-banner p-4 mb-4 rounded-3 bg-success bg-opacity-25">
+          <h3>Welcome back, {{ user.displayName || user.email?.split('@')[0] }}!</h3>
+          <p>Continue listening to your favorite music or discover something new.</p>
+        </div>
         <slot />
       </div>
 
@@ -157,8 +177,10 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 const { user, isAuthenticated, logout } = useAuth()
+const router = useRouter()
 
 // Mock playlists data
 const playlists = ref([
@@ -182,6 +204,16 @@ const login = async () => {
     navigateTo('/login')
   } catch (error) {
     console.error('Login error:', error)
+  }
+}
+
+// Handle logout
+const handleLogout = async () => {
+  try {
+    await logout()
+    router.push('/')
+  } catch (error) {
+    console.error('Logout error:', error)
   }
 }
 </script>
