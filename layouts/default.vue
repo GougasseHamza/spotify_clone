@@ -83,13 +83,8 @@
             <button class="btn btn-dark rounded-circle"><i class="bi bi-chevron-right"></i></button>
           </div>
           
-          <div class="search-container" v-if="$route.path === '/search'">
-            <div class="input-group">
-              <span class="input-group-text bg-dark border-0">
-                <i class="bi bi-search"></i>
-              </span>
-              <input type="text" class="form-control bg-dark border-0 text-white" placeholder="What do you want to play?">
-            </div>
+          <div class="search-container flex-grow-1 mx-4" style="max-width: 600px;">
+            <SearchBar v-if="isAuthenticated" @select="handleTrackSelect" />
           </div>
 
           <div class="d-flex align-items-center gap-3">
@@ -189,6 +184,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '~/composables/useAuth'
+import { useSpotify } from '~/composables/useSpotify'
 
 const { user, isAuthenticated, logout } = useAuth()
 const { isConnected, isInitialized, login: spotifyLogin } = useSpotify()
@@ -234,6 +231,12 @@ const handleLogout = async () => {
   } catch (error) {
     console.error('Logout error:', error)
   }
+}
+
+// Handle track selection
+const handleTrackSelect = (track: any) => {
+  console.log('Selected track:', track)
+  // TODO: Implement track playback
 }
 </script>
 
@@ -345,5 +348,10 @@ const handleLogout = async () => {
   font-size: 1.5rem;
   font-weight: bold;
   letter-spacing: -1px;
+}
+
+.search-container {
+  position: relative;
+  min-width: 300px;
 }
 </style> 
