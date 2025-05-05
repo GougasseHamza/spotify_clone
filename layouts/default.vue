@@ -27,6 +27,17 @@
         </ul>
       </div>
 
+      <!-- Spotify Connection Status -->
+      <div v-if="isAuthenticated && !isSpotifyConnected" class="spotify-status-panel p-3 mb-3 rounded-3 bg-dark-subtle">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h6 class="mb-0">Connect to Spotify</h6>
+        </div>
+        <p class="text-muted small mb-2">Connect to see your playlists and listen to music</p>
+        <button @click="connectToSpotify" class="btn btn-success btn-sm rounded-pill w-100">
+          <i class="bi bi-spotify me-2"></i> Connect
+        </button>
+      </div>
+
       <!-- Library Section -->
       <div class="library-section">
         <div class="d-flex align-items-center justify-content-between p-3">
@@ -176,11 +187,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 const { user, isAuthenticated, logout } = useAuth()
+const { isConnected, isInitialized, login: spotifyLogin } = useSpotify()
 const router = useRouter()
+
+const isSpotifyConnected = computed(() => isInitialized.value && isConnected.value)
 
 // Mock playlists data
 const playlists = ref([
@@ -205,6 +219,11 @@ const login = async () => {
   } catch (error) {
     console.error('Login error:', error)
   }
+}
+
+// Connect to Spotify
+const connectToSpotify = () => {
+  spotifyLogin()
 }
 
 // Handle logout
