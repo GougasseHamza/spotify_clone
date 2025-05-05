@@ -24,6 +24,12 @@
               <i class="bi bi-music-note-list me-3"></i> My Music
             </NuxtLink>
           </li>
+          <li class="nav-item">
+            <NuxtLink to="/player" class="nav-link text-white d-flex align-items-center">
+              <i class="bi bi-speaker-fill me-3"></i>
+              <span>Player</span>
+            </NuxtLink>
+          </li>
         </ul>
       </div>
 
@@ -139,25 +145,38 @@
         <div class="d-flex justify-content-between align-items-center">
           <!-- Track Info -->
           <div class="d-flex align-items-center" style="width: 30%">
-            <img src="https://placeholder.co/56" class="rounded me-3" width="56" height="56" alt="">
-            <div>
-              <div class="track-name">Track Name</div>
-              <div class="artist-name text-muted small">Artist Name</div>
+            <div v-if="currentTrack">
+              <img :src="currentTrack.album?.images?.[0]?.url || '/img/placeholder-album.png'" 
+                   class="rounded me-3" width="56" height="56" :alt="currentTrack.name">
+              <div>
+                <div class="track-name">{{ currentTrack.name }}</div>
+                <div class="artist-name text-muted small">{{ currentTrack.artists?.[0]?.name }}</div>
+              </div>
+              <button class="btn btn-link text-white ms-3">
+                <i class="bi bi-heart"></i>
+              </button>
             </div>
-            <button class="btn btn-link text-white ms-3">
-              <i class="bi bi-heart"></i>
-            </button>
+            <div v-else class="d-flex align-items-center">
+              <div class="text-muted small">Not playing</div>
+              <NuxtLink to="/player" class="btn btn-link text-white ms-3" title="Open player">
+                <i class="bi bi-music-player"></i>
+              </NuxtLink>
+            </div>
           </div>
 
           <!-- Player Controls -->
           <div class="player-controls text-center" style="width: 40%">
             <div class="d-flex justify-content-center align-items-center gap-3 mb-2">
               <button class="btn btn-link text-white"><i class="bi bi-shuffle"></i></button>
-              <button class="btn btn-link text-white"><i class="bi bi-skip-start-fill"></i></button>
-              <button class="btn btn-link text-white rounded-circle play-button">
-                <i class="bi bi-play-fill fs-4"></i>
+              <button @click="previousTrack" class="btn btn-link text-white">
+                <i class="bi bi-skip-start-fill"></i>
               </button>
-              <button class="btn btn-link text-white"><i class="bi bi-skip-end-fill"></i></button>
+              <button @click="togglePlay" class="btn btn-link text-white rounded-circle play-button">
+                <i :class="isPlaying ? 'bi bi-pause-fill' : 'bi bi-play-fill'" class="fs-4"></i>
+              </button>
+              <button @click="nextTrack" class="btn btn-link text-white">
+                <i class="bi bi-skip-end-fill"></i>
+              </button>
               <button class="btn btn-link text-white"><i class="bi bi-repeat"></i></button>
             </div>
             <div class="progress" style="height: 4px">
@@ -171,9 +190,18 @@
             <button class="btn btn-link text-white"><i class="bi bi-list"></i></button>
             <button class="btn btn-link text-white"><i class="bi bi-volume-up"></i></button>
             <div class="progress" style="width: 100px; height: 4px">
-              <div class="progress-bar bg-white" role="progressbar" style="width: 60%"></div>
+              <input 
+                type="range" 
+                class="form-range" 
+                min="0" 
+                max="100" 
+                v-model="volume" 
+                @change="updateVolume"
+              >
             </div>
-            <button class="btn btn-link text-white"><i class="bi bi-arrows-angle-expand"></i></button>
+            <NuxtLink to="/player" class="btn btn-link text-white">
+              <i class="bi bi-arrows-angle-expand"></i>
+            </NuxtLink>
           </div>
         </div>
       </footer>
@@ -186,10 +214,21 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '~/composables/useAuth'
 import { useSpotify } from '~/composables/useSpotify'
+import { useSpotifyPlayer } from '~/composables/useSpotifyPlayer'
 
 const { user, isAuthenticated, logout } = useAuth()
 const { isConnected, isInitialized, login: spotifyLogin } = useSpotify()
+const { 
+  currentTrack, 
+  isPlaying, 
+  togglePlay, 
+  previousTrack,
+  nextTrack,
+  setVolume
+} = useSpotifyPlayer()
+
 const router = useRouter()
+const volume = ref(50)
 
 const isSpotifyConnected = computed(() => isInitialized.value && isConnected.value)
 
@@ -237,6 +276,11 @@ const handleLogout = async () => {
 const handleTrackSelect = (track: any) => {
   console.log('Selected track:', track)
   // TODO: Implement track playback
+}
+
+// Update volume
+const updateVolume = () => {
+  setVolume(volume.value)
 }
 </script>
 

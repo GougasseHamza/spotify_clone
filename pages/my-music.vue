@@ -22,6 +22,9 @@
       </div>
 
       <div v-else>
+        <!-- Spotify Player -->
+        <SpotifyPlayer class="mb-4" />
+
         <!-- Top Artists -->
         <section class="mb-5">
           <h2 class="mb-3">Your Top Artists</h2>
@@ -55,7 +58,12 @@
                   <div class="track-name">{{ track.track.name }}</div>
                   <div class="artist-name text-muted">{{ track.track.artists.map(a => a.name).join(', ') }}</div>
                 </div>
-                <div class="text-muted small">{{ formatDate(track.played_at) }}</div>
+                <div class="text-muted small me-3">{{ formatDate(track.played_at) }}</div>
+                <button @click="playTrack(track.track)" 
+                        class="btn btn-sm btn-success rounded-circle" 
+                        title="Play track">
+                  <i class="bi bi-play-fill"></i>
+                </button>
               </div>
             </div>
             <div v-if="recentlyPlayed.length === 0" class="col-12">
@@ -72,6 +80,37 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useSpotify } from '~/composables/useSpotify'
+import { useSpotifyPlayer } from '~/composables/useSpotifyPlayer'
+import { useAuth } from '~/composables/useAuth'
+
+// Types for Spotify data
+interface SpotifyArtist {
+  id: string;
+  name: string;
+  images: Array<{ url: string }>;
+  uri: string;
+}
+
+interface SpotifyTrack {
+  id: string;
+  name: string;
+  uri: string;
+  album: {
+    name: string;
+    images: Array<{ url: string }>;
+  };
+  artists: Array<{
+    id: string;
+    name: string;
+    uri: string;
+  }>;
+}
+
+interface RecentlyPlayedItem {
+  track: SpotifyTrack;
+  played_at: string;
+}
 
 // Add auth middleware to protect this route
 definePageMeta({
@@ -79,10 +118,11 @@ definePageMeta({
 })
 
 const { getMyTopArtists, getMyRecentlyPlayed, login, hasToken, isConnected, isInitialized } = useSpotify()
+const { playTrack: playerPlayTrack, isPlayerReady } = useSpotifyPlayer()
 const { user, isAuthenticated } = useAuth()
 const isLoading = ref(true)
-const topArtists = ref([])
-const recentlyPlayed = ref([])
+const topArtists = ref<SpotifyArtist[]>([])
+const recentlyPlayed = ref<RecentlyPlayedItem[]>([])
 const isSpotifyConnected = computed(() => isInitialized.value && isConnected.value)
 
 onMounted(async () => {
@@ -112,7 +152,7 @@ onMounted(async () => {
 })
 
 // Function to wait for a condition
-const waitFor = (condition, maxWait = 5000, interval = 100) => {
+const waitFor = (condition: () => boolean, maxWait = 5000, interval = 100) => {
   return new Promise<void>((resolve, reject) => {
     if (condition()) {
       resolve()
@@ -147,17 +187,28 @@ const loadMusicData = async () => {
     ])
     
     if (artistsData.status === 'fulfilled' && artistsData.value) {
-      topArtists.value = artistsData.value
+      topArtists.value = artistsData.value as SpotifyArtist[]
     }
     
     if (recentlyPlayedData.status === 'fulfilled' && recentlyPlayedData.value) {
-      recentlyPlayed.value = recentlyPlayedData.value
+      recentlyPlayed.value = recentlyPlayedData.value as RecentlyPlayedItem[]
     }
   } catch (error) {
     console.error('Error loading music data:', error)
   } finally {
     isLoading.value = false
   }
+}
+
+// Play a track
+const playTrack = (track: SpotifyTrack) => {
+  if (!isPlayerReady.value) {
+    console.warn('Spotify player is not ready yet')
+    return
+  }
+  
+  console.log('Playing track:', track.name)
+  playerPlayTrack(track.uri)
 }
 
 // Format date to relative time (e.g., "2 hours ago")

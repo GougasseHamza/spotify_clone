@@ -7,6 +7,9 @@
       </div>
     </div>
 
+    <!-- Spotify Player -->
+    <SpotifyPlayer class="mb-4" />
+    
     <!-- Search Results -->
     <div v-if="searchResults.length > 0" class="search-results">
       <h2 class="mb-4">Top Results</h2>
@@ -18,7 +21,7 @@
           <div class="track-image">
             <img :src="track.album.images[1]?.url || '/default-album.png'" 
                  :alt="track.album.name">
-            <button class="play-button">
+            <button class="play-button" @click.stop="playTrack(track)">
               <i class="bi bi-play-fill"></i>
             </button>
           </div>
@@ -47,8 +50,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useSpotify } from '~/composables/useSpotify'
+import { useSpotifyPlayer } from '~/composables/useSpotifyPlayer'
 
 const { searchTracks } = useSpotify()
+const { playTrack: playerPlayTrack, isPlayerReady } = useSpotifyPlayer()
 const searchResults = ref<any[]>([])
 
 // Mock categories data
@@ -63,7 +68,17 @@ const categories = ref([
 
 const handleTrackSelect = (track: any) => {
   console.log('Selected track:', track)
-  // TODO: Implement track playback
+  searchResults.value = [track, ...searchResults.value.filter(t => t.id !== track.id)]
+}
+
+const playTrack = (track: any) => {
+  if (!isPlayerReady.value) {
+    console.warn('Spotify player is not ready yet')
+    return
+  }
+  
+  console.log('Playing track:', track.name)
+  playerPlayTrack(track.uri)
 }
 </script>
 

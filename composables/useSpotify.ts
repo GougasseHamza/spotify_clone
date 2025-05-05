@@ -297,6 +297,19 @@ export const useSpotify = () => {
     return values.reduce((acc, x) => acc + possible[x % possible.length], '')
   }
 
+  // Play a track or context
+  const play = async (options: any) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        await spotifyApi.play(options)
+        return true
+      } catch (error) {
+        console.error('Error playing content:', error)
+        throw error
+      }
+    })
+  }
+
   console.log('SpotifyWebApi initialized with redirect URI:', config.public.spotifyRedirectUri)
 
   return {
@@ -310,6 +323,8 @@ export const useSpotify = () => {
     getMyTopArtists,
     getMyRecentlyPlayed,
     searchTracks,
-    spotifyApi
+    spotifyApi,
+    refreshAccessToken,
+    play
   }
 } 
