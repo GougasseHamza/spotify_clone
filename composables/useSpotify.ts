@@ -434,6 +434,19 @@ export const useSpotify = () => {
     })
   }
 
+  // Transfer playback to a specific device
+  const transferMyPlayback = async (deviceIds: string[], options: { play?: boolean } = {}) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        await spotifyApi.transferMyPlayback(deviceIds, options)
+        return true
+      } catch (error) {
+        console.error('Error transferring playback:', error)
+        throw error
+      }
+    })
+  }
+
   console.log('SpotifyWebApi initialized with redirect URI:', config.public.spotifyRedirectUri)
 
   return {
@@ -458,6 +471,7 @@ export const useSpotify = () => {
     getLikedSongs,
     createPlaylist,
     getArtistTopTracks,
-    getArtist
+    getArtist,
+    transferMyPlayback
   }
 } 
