@@ -1,191 +1,267 @@
 <template>
-  <div class="home-page">
-    <!-- Featured Section -->
-    <section class="featured-section mb-5">
-      <h2 class="mb-4">Good evening</h2>
-      <div class="row g-3">
-        <div v-for="playlist in featuredPlaylists" :key="playlist.id" class="col-12 col-md-6 col-lg-4 col-xl-3">
-          <div class="featured-card d-flex align-items-center bg-dark-subtle rounded overflow-hidden">
-            <img :src="playlist.imageUrl" :alt="playlist.name" class="featured-image">
-            <div class="p-3 flex-grow-1">
-              <h5 class="mb-0">{{ playlist.name }}</h5>
-            </div>
-            <button class="play-button-overlay btn btn-success rounded-circle me-3">
-              <i class="bi bi-play-fill fs-4"></i>
-            </button>
-          </div>
-        </div>
+  <div class="container-fluid">
+    <!-- Loading State -->
+    <div v-if="isLoading" class="text-center py-5">
+      <div class="spinner-border text-light" role="status">
+        <span class="visually-hidden">Loading...</span>
       </div>
-    </section>
+      <p class="mt-3 text-light">Loading your music...</p>
+    </div>
 
-    <!-- Made For You -->
-    <section class="made-for-you mb-5">
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0">Made for you</h2>
-        <button class="btn btn-link text-white text-decoration-none">Show all</button>
-      </div>
-      <div class="row g-3">
-        <div v-for="playlist in madeForYou" :key="playlist.id" class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
-          <div class="card bg-dark h-100 playlist-card">
-            <div class="position-relative">
-              <img :src="playlist.imageUrl" class="card-img-top" :alt="playlist.name">
-              <button class="play-button-overlay btn btn-success rounded-circle">
-                <i class="bi bi-play-fill fs-4"></i>
-              </button>
-            </div>
-            <div class="card-body">
-              <h5 class="card-title text-truncate">{{ playlist.name }}</h5>
-              <p class="card-text text-muted">{{ playlist.description }}</p>
-            </div>
-          </div>
+    <!-- Connection Status -->
+    <div v-else-if="!isConnected" class="alert alert-info m-3">
+      <div class="d-flex align-items-center">
+        <i class="bi bi-spotify me-2"></i>
+        <div>
+          <strong>Connect to Spotify</strong>
+          <p class="mb-0">Connect your Spotify account to see your personalized content.</p>
         </div>
       </div>
-    </section>
+      <div class="mt-3">
+        <button @click="connectSpotify" class="btn btn-success me-2" :disabled="isConnecting">
+          <i class="bi bi-spotify me-2"></i>
+          {{ isConnecting ? 'Connecting...' : 'Connect to Spotify' }}
+        </button>
+        <button @click="logout" class="btn btn-outline-light">
+          <i class="bi bi-box-arrow-right me-2"></i>
+          Logout
+        </button>
+      </div>
+    </div>
 
-    <!-- Recently Played -->
-    <section class="recently-played">
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0">Recently played</h2>
-        <button class="btn btn-link text-white text-decoration-none">Show all</button>
-      </div>
-      <div class="row g-3">
-        <div v-for="track in recentlyPlayed" :key="track.id" class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
-          <div class="card bg-dark h-100 playlist-card">
-            <div class="position-relative">
-              <img :src="track.imageUrl" class="card-img-top" :alt="track.name">
-              <button class="play-button-overlay btn btn-success rounded-circle">
-                <i class="bi bi-play-fill fs-4"></i>
-              </button>
-            </div>
-            <div class="card-body">
-              <h5 class="card-title text-truncate">{{ track.name }}</h5>
-              <p class="card-text text-muted">{{ track.artist }}</p>
+    <!-- Content -->
+    <div v-else>
+      <!-- Recently Played Section -->
+      <section class="mb-5">
+        <h2 class="mb-4">Recently Played</h2>
+        <div class="row g-4">
+          <div v-for="item in recentlyPlayed" :key="item.track.id" class="col-md-4 col-lg-3">
+            <div class="card bg-dark text-white h-100">
+              <img 
+                :src="item.track.album.images[0].url" 
+                class="card-img-top" 
+                :alt="item.track.name"
+              >
+              <div class="card-body">
+                <h5 class="card-title">{{ item.track.name }}</h5>
+                <p class="card-text text-muted small">
+                  {{ item.track.artists.map(a => a.name).join(', ') }}
+                </p>
+                <button 
+                  @click="playTrack(item.track)" 
+                  class="btn btn-success btn-sm"
+                  :disabled="!isPlayerReady"
+                >
+                  <i class="bi bi-play-fill"></i> Play
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <!-- Your Playlists Section -->
+      <section class="mb-5">
+        <h2 class="mb-4">Your Playlists</h2>
+        <div class="row g-4">
+          <div v-for="playlist in userPlaylists" :key="playlist.id" class="col-md-4 col-lg-3">
+            <div class="card bg-dark text-white h-100">
+              <img 
+                :src="playlist.images?.[0]?.url || '/img/placeholder-playlist.png'" 
+                class="card-img-top" 
+                :alt="playlist.name"
+              >
+              <div class="card-body">
+                <h5 class="card-title">{{ playlist.name }}</h5>
+                <p class="card-text text-muted small">
+                  {{ playlist.tracks.total }} tracks • By {{ playlist.owner.display_name }}
+                </p>
+                <div class="d-flex gap-2">
+                  <button 
+                    @click="playPlaylist(playlist)" 
+                    class="btn btn-success btn-sm"
+                    :disabled="!isPlayerReady"
+                  >
+                    <i class="bi bi-play-fill"></i> Play
+                  </button>
+                  <NuxtLink 
+                    :to="`/playlist/${playlist.id}`" 
+                    class="btn btn-outline-light btn-sm"
+                  >
+                    <i class="bi bi-list"></i> View Tracks
+                  </NuxtLink>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-const featuredPlaylists = ref([
-  {
-    id: '1',
-    name: 'Liked Songs',
-    imageUrl: 'https://misc.scdn.co/liked-songs/liked-songs-640.png'
-  },
-  {
-    id: '2',
-    name: 'Daily Mix 1',
-    imageUrl: 'https://dailymix-images.scdn.co/v2/img/ab6761610000e5eb1020c5e0e7da5a82a475e9dc/1/en/default'
-  },
-  {
-    id: '3',
-    name: 'Discover Weekly',
-    imageUrl: 'https://newjams-images.scdn.co/image/ab676477000033ad/dt/v3/discover-weekly/aAbca4VNfzWuUCQ_FGiEFA==/dHB0cHRwdA=='
-  }
-])
+import { ref, onMounted } from 'vue'
+import { useSpotify } from '~/composables/useSpotify'
+import { useSpotifyPlayer } from '~/composables/useSpotifyPlayer'
 
-const madeForYou = ref([
-  {
-    id: '1',
-    name: 'Daily Mix 1',
-    description: 'Lauv, Ed Sheeran, Justin Bieber and more',
-    imageUrl: 'https://dailymix-images.scdn.co/v2/img/ab6761610000e5eb1020c5e0e7da5a82a475e9dc/1/en/default'
-  },
-  {
-    id: '2',
-    name: 'Discover Weekly',
-    description: 'Your weekly mixtape of fresh music',
-    imageUrl: 'https://newjams-images.scdn.co/image/ab676477000033ad/dt/v3/discover-weekly/aAbca4VNfzWuUCQ_FGiEFA==/dHB0cHRwdA=='
+interface SpotifyTrack {
+  id: string
+  name: string
+  uri: string
+  album: {
+    images: { url: string }[]
   }
-])
+  artists: Array<{ name: string }>
+}
 
-const recentlyPlayed = ref([
-  {
-    id: '1',
-    name: 'Shape of You',
-    artist: 'Ed Sheeran',
-    imageUrl: 'https://i.scdn.co/image/ab67616d0000b273ba5db46f4b838ef6027e6f96'
-  },
-  {
-    id: '2',
-    name: 'Blinding Lights',
-    artist: 'The Weeknd',
-    imageUrl: 'https://i.scdn.co/image/ab67616d0000b273a6a2a27d9369a921d5bb5846'
+interface RecentlyPlayedItem {
+  track: SpotifyTrack
+  played_at: string
+}
+
+interface LikedSong {
+  track: SpotifyTrack
+  added_at: string
+}
+
+interface SpotifyPlaylist {
+  id: string
+  name: string
+  description: string | null
+  images: { url: string }[]
+  tracks: {
+    total: number
   }
-])
+  owner: {
+    display_name: string
+  }
+}
+
+const { 
+  getMyRecentlyPlayed, 
+  getUserPlaylists, 
+  getLikedSongs,
+  login,
+  logout,
+  isConnected,
+  isInitialized,
+  play
+} = useSpotify()
+
+const { playTrack: playerPlayTrack, isPlayerReady } = useSpotifyPlayer()
+
+const isLoading = ref(true)
+const isConnecting = ref(false)
+const recentlyPlayed = ref<RecentlyPlayedItem[]>([])
+const userPlaylists = ref<SpotifyPlaylist[]>([])
+const likedSongs = ref<LikedSong[]>([])
+
+onMounted(async () => {
+  try {
+    // Wait for Spotify to initialize
+    await waitFor(() => isInitialized.value)
+    isLoading.value = false
+    
+    // Only try to load data if we have a token
+    if (isConnected.value) {
+      loadHomeData()
+    }
+  } catch (error) {
+    console.error('Error in initialization:', error)
+    isLoading.value = false
+  }
+})
+
+// Function to wait for a condition
+const waitFor = (condition: () => boolean, maxWait = 5000, interval = 100) => {
+  return new Promise<void>((resolve, reject) => {
+    if (condition()) {
+      resolve()
+      return
+    }
+    
+    const startTime = Date.now()
+    const intervalId = setInterval(() => {
+      if (condition()) {
+        clearInterval(intervalId)
+        resolve()
+        return
+      }
+      
+      if (Date.now() - startTime > maxWait) {
+        clearInterval(intervalId)
+        resolve() // Resolve anyway after timeout
+      }
+    }, interval)
+  })
+}
+
+// Load home page data
+const loadHomeData = async () => {
+  if (!isConnected.value) return
+
+  try {
+    isLoading.value = true
+
+    // Load data in parallel
+    const [recent, playlists] = await Promise.all([
+      getMyRecentlyPlayed(),
+      getUserPlaylists()
+    ])
+
+    recentlyPlayed.value = recent
+    userPlaylists.value = playlists
+  } catch (error) {
+    console.error('Error loading home data:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Play a track
+const playTrack = (track: SpotifyTrack) => {
+  if (!isPlayerReady.value) {
+    console.warn('Player not ready')
+    return
+  }
+  
+  playerPlayTrack(track.uri)
+}
+
+// Play a playlist
+const playPlaylist = async (playlist: SpotifyPlaylist) => {
+  if (!isPlayerReady.value) {
+    console.warn('Player not ready')
+    return
+  }
+
+  try {
+    await play({ context_uri: `spotify:playlist:${playlist.id}` })
+  } catch (error) {
+    console.error('Error playing playlist:', error)
+  }
+}
+
+// Connect to Spotify
+const connectSpotify = () => {
+  isConnecting.value = true
+  login()
+}
 </script>
 
 <style scoped>
-.home-page {
-  padding: 20px;
-}
-
-.featured-card {
-  position: relative;
+.card {
+  transition: transform 0.2s;
   cursor: pointer;
-  transition: background-color 0.3s;
 }
 
-.featured-card:hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-.featured-image {
-  width: 80px;
-  height: 80px;
-  object-fit: cover;
-}
-
-.playlist-card {
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.playlist-card:hover {
-  background-color: #282828 !important;
-}
-
-.play-button-overlay {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  opacity: 0;
-  transform: translateY(8px);
-  transition: all 0.3s;
-  background-color: #1DB954;
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.featured-card:hover .play-button-overlay,
-.playlist-card:hover .play-button-overlay {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.play-button-overlay:hover {
-  transform: scale(1.1) !important;
-  background-color: #1ed760 !important;
+.card:hover {
+  transform: translateY(-4px);
 }
 
 .card-img-top {
-  aspect-ratio: 1;
+  height: 200px;
   object-fit: cover;
-}
-
-h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.bg-dark-subtle {
-  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 </style> 

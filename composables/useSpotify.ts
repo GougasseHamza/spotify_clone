@@ -69,32 +69,62 @@ export const useSpotify = () => {
 
   // Refresh access token using refresh token
   const refreshAccessToken = async () => {
+    if (!process.client) return null
+    
     try {
-      if (!spotifyApi.getRefreshToken()) {
+      const refreshToken = localStorage.getItem('spotify_refresh_token')
+      if (!refreshToken) {
         console.error('No refresh token available')
-        return false
+        return null
       }
-      
-      const data = await spotifyApi.refreshAccessToken()
-      const token = {
-        access_token: data.body.access_token,
-        refresh_token: spotifyApi.getRefreshToken(),
-        expires_in: data.body.expires_in
+
+      const params = new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      })
+
+      const response = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${btoa(`${config.public.spotifyClientId}:${config.spotifyClientSecret}`)}`
+        },
+        body: params.toString()
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('Token refresh failed:', errorData)
+        throw new Error('Failed to refresh token')
       }
-      
-      spotifyApi.setAccessToken(data.body.access_token)
-      persistToken(token)
+
+      const data = await response.json()
+      const newAccessToken = data.access_token
+      const newRefreshToken = data.refresh_token || refreshToken
+
+      localStorage.setItem('spotify_access_token', newAccessToken)
+      if (data.refresh_token) {
+        localStorage.setItem('spotify_refresh_token', newRefreshToken)
+      }
+
+      spotifyApi.setAccessToken(newAccessToken)
       isConnected.value = true
-      return true
+      return newAccessToken
     } catch (error) {
-      console.error('Failed to refresh access token', error)
-      return false
+      console.error('Error refreshing token:', error)
+      isConnected.value = false
+      return null
     }
   }
 
   // Login with Spotify - redirects to Spotify authorization page
   const login = () => {
     if (!process.client) return
+    
+    // Clear existing tokens to force re-authentication
+    localStorage.removeItem('spotify_access_token')
+    localStorage.removeItem('spotify_refresh_token')
+    localStorage.removeItem('spotify_token_expires')
     
     const scopes = [
       'user-read-private',
@@ -106,44 +136,21 @@ export const useSpotify = () => {
       'user-top-read',
       'playlist-read-private',
       'playlist-read-collaborative',
-      'streaming'
-    ]
+      'streaming',
+      'user-library-read',
+      'user-library-modify'  // Add this for full library access
+    ].join(' ')
     
-    // Get current URI for better redirect handling
-    let redirectUri = config.public.spotifyRedirectUri
+    const params = new URLSearchParams({
+      client_id: config.public.spotifyClientId,
+      response_type: 'code',
+      redirect_uri: config.public.spotifyRedirectUri,
+      scope: scopes,
+      show_dialog: 'true',  // Force re-authentication
+      state: generateRandomString(16)  // Add state parameter for security
+    })
     
-    // Ensure we're not trying to use a production URI in local development
-    if (process.client && window.location.hostname === 'localhost' && 
-        !redirectUri.includes('localhost')) {
-      redirectUri = `http://${window.location.host}/callback`
-      console.warn('Using localhost redirect URI:', redirectUri)
-    }
-    
-    // Generate authorization URL manually if createAuthorizeURL is not available
-    try {
-      const state = generateRandomString(16)
-      let authorizeURL
-      
-      if (typeof spotifyApi.createAuthorizeURL === 'function') {
-        // Override the redirect URI for local development if needed
-        authorizeURL = spotifyApi.createAuthorizeURL(scopes, state)
-      } else {
-        // Manual URL creation as fallback
-        const scopeString = scopes.join(' ')
-        authorizeURL = 'https://accounts.spotify.com/authorize' +
-          '?client_id=' + config.public.spotifyClientId +
-          '&response_type=code' +
-          '&redirect_uri=' + encodeURIComponent(redirectUri) +
-          '&scope=' + encodeURIComponent(scopeString) +
-          '&state=' + state
-      }
-      
-      console.log('Redirecting to Spotify login:', authorizeURL)
-      window.location.href = authorizeURL
-    } catch (error) {
-      console.error('Error creating authorize URL:', error)
-      alert('Error connecting to Spotify. Please try again later.')
-    }
+    window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`
   }
 
   const handleCallback = async (code: string) => {
@@ -159,20 +166,13 @@ export const useSpotify = () => {
         body: JSON.stringify({ code })
       })
       
-      const responseText = await response.text()
-      let tokenData
-      
-      try {
-        tokenData = JSON.parse(responseText)
-      } catch (e) {
-        console.error('Failed to parse token response:', responseText)
-        throw new Error('Invalid response from server')
-      }
-      
       if (!response.ok) {
-        console.error('Token exchange failed:', tokenData)
-        throw new Error(tokenData.message || 'Failed to exchange token')
+        const errorData = await response.json()
+        console.error('Token exchange failed:', errorData)
+        throw new Error(errorData.message || 'Failed to exchange token')
       }
+      
+      const tokenData = await response.json()
       
       if (!tokenData.access_token || !tokenData.refresh_token) {
         console.error('Invalid token data received:', tokenData)
@@ -347,6 +347,18 @@ export const useSpotify = () => {
     })
   }
 
+  const getLikedSongs = async (limit = 50) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        const response = await spotifyApi.getMySavedTracks({ limit })
+        return response.body.items
+      } catch (error) {
+        console.error('Error fetching liked songs:', error)
+        throw error
+      }
+    })
+  }
+
   console.log('SpotifyWebApi initialized with redirect URI:', config.public.spotifyRedirectUri)
 
   return {
@@ -365,6 +377,7 @@ export const useSpotify = () => {
     play,
     getUserProfile,
     getUserPlaylists,
-    getPlaylistTracks
+    getPlaylistTracks,
+    getLikedSongs
   }
 } 
