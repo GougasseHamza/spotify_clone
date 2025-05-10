@@ -19,8 +19,20 @@
         />
         <div class="track-info">
           <h2>{{ currentTrack?.name || 'No track playing' }}</h2>
-          <p>{{ currentTrack?.artists?.map((artist: SpotifyArtist) => artist.name).join(', ') || 'No artist' }}</p>
+          <p class="artists">{{ currentTrack?.artists?.map((artist: SpotifyArtist) => artist.name).join(', ') || 'No artist' }}</p>
+          <p class="album">{{ currentTrack?.album?.name || 'No album' }}</p>
         </div>
+      </div>
+
+      <div class="progress-bar">
+        <span class="time current">{{ formatTime(currentTrack?.progress_ms || 0) }}</span>
+        <div class="progress-track">
+          <div 
+            class="progress-fill" 
+            :style="{ width: `${(currentTrack?.progress_ms || 0) / (currentTrack?.duration_ms || 1) * 100}%` }"
+          ></div>
+        </div>
+        <span class="time total">{{ formatTime(currentTrack?.duration_ms || 0) }}</span>
       </div>
 
       <div class="player-controls">
@@ -91,6 +103,13 @@ const {
   setVolume,
   volume
 } = useSpotifyPlayer()
+
+// Format time in milliseconds to MM:SS
+const formatTime = (ms: number) => {
+  const minutes = Math.floor(ms / 60000)
+  const seconds = Math.floor((ms % 60000) / 1000)
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
 </script>
 
 <style scoped>
@@ -146,16 +165,18 @@ const {
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: 1rem;
+  padding: 1.5rem;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .track-image {
-  width: 120px;
-  height: 120px;
-  border-radius: 4px;
+  width: 160px;
+  height: 160px;
+  border-radius: 8px;
   object-fit: cover;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .track-info {
@@ -163,20 +184,60 @@ const {
 }
 
 .track-info h2 {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   margin-bottom: 0.5rem;
   color: #fff;
+  font-weight: 700;
 }
 
-.track-info p {
+.track-info .artists {
+  font-size: 1.2rem;
   color: #b3b3b3;
+  margin-bottom: 0.5rem;
+}
+
+.track-info .album {
+  font-size: 1rem;
+  color: #808080;
+}
+
+.progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+}
+
+.progress-track {
+  flex: 1;
+  height: 4px;
+  background: #535353;
+  border-radius: 2px;
+  position: relative;
+  cursor: pointer;
+}
+
+.progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: #1DB954;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+
+.time {
+  font-size: 0.8rem;
+  color: #b3b3b3;
+  min-width: 40px;
 }
 
 .player-controls {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .control-button {
@@ -203,8 +264,8 @@ const {
 .play-button {
   font-size: 2rem;
   background: #1DB954;
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -212,6 +273,7 @@ const {
 
 .play-button:hover:not(:disabled) {
   background: #1ed760;
+  transform: scale(1.1);
 }
 
 .volume-control {
@@ -249,5 +311,31 @@ const {
 .volume-control i {
   color: #b3b3b3;
   font-size: 1.2rem;
+}
+
+@media (max-width: 640px) {
+  .current-track {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .track-image {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .track-info h2 {
+    font-size: 1.5rem;
+  }
+  
+  .track-info .artists {
+    font-size: 1rem;
+  }
+  
+  .play-button {
+    width: 56px;
+    height: 56px;
+    font-size: 1.8rem;
+  }
 }
 </style> 

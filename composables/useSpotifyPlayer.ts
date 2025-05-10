@@ -35,43 +35,40 @@ export const useSpotifyPlayer = () => {
   
   // Initialize the player
   const initializePlayer = () => {
+    console.log('[SpotifyPlayer] initializePlayer called')
     if (!window.Spotify) {
-      console.error('Spotify SDK not loaded')
+      console.error('[SpotifyPlayer] Spotify SDK not loaded')
       playerError.value = 'Spotify SDK not loaded'
       return
     }
-    
+
     const token = spotifyApi.getAccessToken()
     if (!token) {
-      console.error('User not authenticated with Spotify or token is missing')
+      console.error('[SpotifyPlayer] No Spotify access token available')
       playerError.value = 'No Spotify access token available'
       return
     }
-    
-    console.log('Initializing Spotify Web Player...')
-    
+
+    console.log('[SpotifyPlayer] Initializing Spotify Web Player...')
+
     player.value = new window.Spotify.Player({
       name: 'Spotify Clone Web Player',
       getOAuthToken: async (cb: (token: string) => void) => {
         let token = spotifyApi.getAccessToken()
-        
-        // If token might be expired, refresh it
         try {
           const refreshed = await refreshAccessToken()
           if (refreshed) {
             token = spotifyApi.getAccessToken() || ''
-            console.log('Token refreshed successfully for player')
+            console.log('[SpotifyPlayer] Token refreshed successfully for player')
           } else {
-            console.warn('Token refresh was not successful')
+            console.warn('[SpotifyPlayer] Token refresh was not successful')
           }
         } catch (error) {
-          console.error('Error refreshing access token:', error)
+          console.error('[SpotifyPlayer] Error refreshing access token:', error)
         }
-        
         if (!token) {
-          console.error('No access token available after refresh attempt')
+          console.error('[SpotifyPlayer] No access token available after refresh attempt')
         }
-        
         cb(token || '')
       },
       volume: 0.5
@@ -79,32 +76,34 @@ export const useSpotifyPlayer = () => {
     
     // Error handling
     player.value.addListener('initialization_error', ({ message }) => {
-      console.error('Initialization error:', message)
+      console.error('[SpotifyPlayer] Initialization error:', message)
       playerError.value = `Initialization error: ${message}`
       isPlayerReady.value = false
     })
     
     player.value.addListener('authentication_error', ({ message }) => {
-      console.error('Authentication error:', message)
+      console.error('[SpotifyPlayer] Authentication error:', message)
       playerError.value = `Authentication error: ${message}`
       isPlayerReady.value = false
     })
     
     player.value.addListener('account_error', ({ message }) => {
-      console.error('Account error:', message)
+      console.error('[SpotifyPlayer] Account error:', message)
       playerError.value = `Premium required: ${message}`
       isPlayerReady.value = false
     })
     
     player.value.addListener('playback_error', ({ message }) => {
-      console.error('Playback error:', message)
+      console.error('[SpotifyPlayer] Playback error:', message)
       playerError.value = `Playback error: ${message}`
     })
     
     // Playback status updates
     player.value.addListener('player_state_changed', (state) => {
+      console.log('[SpotifyPlayer] player_state_changed', state)
       if (!state) {
         isPlaying.value = false
+        currentTrack.value = null
         return
       }
       
@@ -112,13 +111,17 @@ export const useSpotifyPlayer = () => {
       isPlaying.value = !state.paused
       
       if (state.track_window?.current_track) {
-        currentTrack.value = state.track_window.current_track
+        currentTrack.value = {
+          ...state.track_window.current_track,
+          duration_ms: state.duration,
+          progress_ms: state.position
+        }
       }
     })
     
     // Ready
     player.value.addListener('ready', async ({ device_id }) => {
-      console.log('Ready with Device ID', device_id)
+      console.log('[SpotifyPlayer] Ready with Device ID', device_id)
       deviceId.value = device_id
       
       // Try to set this device as active
@@ -131,23 +134,25 @@ export const useSpotifyPlayer = () => {
         try {
           if (player.value) {
             const state = await player.value.getCurrentState()
+            console.log('[SpotifyPlayer] Initial playback state', state)
             if (state) {
               isPlaying.value = !state.paused
               currentTrack.value = state.track_window.current_track
             }
           }
         } catch (error) {
-          console.error('Error getting initial playback state:', error)
+          console.error('[SpotifyPlayer] Error getting initial playback state:', error)
         }
       } else {
         playerError.value = 'Failed to set device as active'
         isPlayerReady.value = false
+        console.error('[SpotifyPlayer] Failed to set device as active')
       }
     })
     
     // Not Ready
     player.value.addListener('not_ready', ({ device_id }) => {
-      console.log('Device ID has gone offline', device_id)
+      console.log('[SpotifyPlayer] Device ID has gone offline', device_id)
       isPlayerReady.value = false
       deviceId.value = null
     })
@@ -155,14 +160,14 @@ export const useSpotifyPlayer = () => {
     // Connect to the player
     player.value.connect().then(success => {
       if (success) {
-        console.log('Successfully connected to Spotify player')
+        console.log('[SpotifyPlayer] Successfully connected to Spotify player')
       } else {
-        console.error('Failed to connect to Spotify player')
+        console.error('[SpotifyPlayer] Failed to connect to Spotify player')
         playerError.value = 'Failed to connect to player'
         isPlayerReady.value = false
       }
     }).catch(error => {
-      console.error('Error connecting to Spotify player:', error)
+      console.error('[SpotifyPlayer] Error connecting to Spotify player:', error)
       playerError.value = 'Error connecting to player'
       isPlayerReady.value = false
     })
@@ -190,7 +195,7 @@ export const useSpotifyPlayer = () => {
   // Set this device as active
   const setActiveDevice = async () => {
     if (!deviceId.value) {
-      console.error('No device ID available')
+      console.error('[SpotifyPlayer] setActiveDevice: No device ID available')
       return false
     }
 
@@ -199,14 +204,15 @@ export const useSpotifyPlayer = () => {
       const response = await spotifyApi.getMyDevices()
       const devices = response.body.devices as SpotifyDevice[]
       const currentDevice = devices.find((d: SpotifyDevice) => d.id === deviceId.value)
-      
+      console.log('[SpotifyPlayer] setActiveDevice: Devices', devices)
       if (currentDevice?.is_active) {
-        console.log('Device is already active')
+        console.log('[SpotifyPlayer] setActiveDevice: Device is already active')
         return true
       }
 
       // If not active, transfer playback to this device
       await spotifyApi.transferMyPlayback([deviceId.value], { play: false })
+      console.log('[SpotifyPlayer] setActiveDevice: Transferred playback to device', deviceId.value)
       
       // Wait a moment for the transfer to complete
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -217,13 +223,13 @@ export const useSpotifyPlayer = () => {
       const verifyDevice = verifyDevices.find((d: SpotifyDevice) => d.id === deviceId.value)
       
       if (!verifyDevice?.is_active) {
-        console.error('Device activation verification failed')
+        console.error('[SpotifyPlayer] setActiveDevice: Device activation verification failed')
         return false
       }
       
       return true
     } catch (error) {
-      console.error('Error setting active device:', error)
+      console.error('[SpotifyPlayer] setActiveDevice: Error setting active device:', error)
       return false
     }
   }
@@ -245,6 +251,14 @@ export const useSpotifyPlayer = () => {
       
       // Wait a moment for device activation to settle
       await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // First try to get the current state to ensure we're connected
+      const state = await player.value?.getCurrentState()
+      if (!state) {
+        console.log('No current state, attempting to reconnect player...')
+        await player.value?.connect()
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
       
       await spotifyApi.play({
         device_id: deviceId.value,
@@ -432,22 +446,24 @@ export const useSpotifyPlayer = () => {
   const previousTrack = async () => {
     if (!player.value || !isPlayerReady.value || !deviceId.value) {
       playerError.value = 'Player not ready'
+      console.warn('[SpotifyPlayer] Previous: Player not ready', { player: !!player.value, isPlayerReady: isPlayerReady.value, deviceId: deviceId.value })
       return
     }
-    
+
     try {
       // Ensure this device is active
       await setActiveDevice()
-      
       const state = await player.value.getCurrentState()
+      console.log('[SpotifyPlayer] Previous: Current state', state)
       if (state?.disallows.skipping_prev) {
-        playerError.value = 'Cannot skip to previous track'
+        playerError.value = 'Cannot skip to previous track (disallowed by Spotify)'
+        console.warn('[SpotifyPlayer] Previous: Skipping previous is disallowed', state?.disallows)
         return
       }
-      
       await player.value.previousTrack()
+      console.log('[SpotifyPlayer] Previous: Command sent')
     } catch (error) {
-      console.error('Error skipping to previous track:', error)
+      console.error('[SpotifyPlayer] Error skipping to previous track:', error)
       playerError.value = 'Error skipping to previous track'
     }
   }
@@ -456,22 +472,38 @@ export const useSpotifyPlayer = () => {
   const nextTrack = async () => {
     if (!player.value || !isPlayerReady.value || !deviceId.value) {
       playerError.value = 'Player not ready'
+      console.warn('[SpotifyPlayer] Next: Player not ready', { player: !!player.value, isPlayerReady: isPlayerReady.value, deviceId: deviceId.value })
       return
     }
-    
+
     try {
       // Ensure this device is active
-      await setActiveDevice()
-      
-      const state = await player.value.getCurrentState()
-      if (state?.disallows.skipping_next) {
-        playerError.value = 'Cannot skip to next track'
+      const success = await setActiveDevice()
+      if (!success) {
+        playerError.value = 'Failed to set device as active'
+        console.warn('[SpotifyPlayer] Next: Failed to set device as active')
         return
       }
-      
+      // Wait a moment for device activation to settle
+      await new Promise(resolve => setTimeout(resolve, 500))
+      const state = await player.value.getCurrentState()
+      console.log('[SpotifyPlayer] Next: Current state', state)
+      if (state?.disallows.skipping_next) {
+        playerError.value = 'Cannot skip to next track (disallowed by Spotify)'
+        console.warn('[SpotifyPlayer] Next: Skipping next is disallowed', state?.disallows)
+        return
+      }
       await player.value.nextTrack()
+      console.log('[SpotifyPlayer] Next: Command sent')
+      // Wait for the track to change and update state
+      await new Promise(resolve => setTimeout(resolve, 500))
+      const newState = await player.value.getCurrentState()
+      if (newState) {
+        isPlaying.value = !newState.paused
+        currentTrack.value = newState.track_window.current_track
+      }
     } catch (error) {
-      console.error('Error skipping to next track:', error)
+      console.error('[SpotifyPlayer] Error skipping to next track:', error)
       playerError.value = 'Error skipping to next track'
     }
   }
