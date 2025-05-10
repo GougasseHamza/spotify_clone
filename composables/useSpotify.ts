@@ -310,6 +310,43 @@ export const useSpotify = () => {
     })
   }
 
+  // Add these functions before the return statement
+  const getUserProfile = async () => {
+    return callWithTokenRefresh(async () => {
+      try {
+        const response = await spotifyApi.getMe()
+        return response
+      } catch (error) {
+        console.error('Error fetching user profile:', error)
+        throw error
+      }
+    })
+  }
+
+  const getUserPlaylists = async (limit = 50) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        const response = await spotifyApi.getUserPlaylists({ limit })
+        return response.body.items
+      } catch (error) {
+        console.error('Error fetching user playlists:', error)
+        throw error
+      }
+    })
+  }
+
+  const getPlaylistTracks = async (playlistId: string) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        const response = await spotifyApi.getPlaylistTracks(playlistId)
+        return response.body.items
+      } catch (error) {
+        console.error('Error fetching playlist tracks:', error)
+        throw error
+      }
+    })
+  }
+
   console.log('SpotifyWebApi initialized with redirect URI:', config.public.spotifyRedirectUri)
 
   return {
@@ -325,6 +362,9 @@ export const useSpotify = () => {
     searchTracks,
     spotifyApi,
     refreshAccessToken,
-    play
+    play,
+    getUserProfile,
+    getUserPlaylists,
+    getPlaylistTracks
   }
 } 
