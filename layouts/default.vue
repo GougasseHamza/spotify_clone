@@ -46,33 +46,49 @@
 
       <!-- Library Section -->
       <div class="library-section">
-        <div class="d-flex align-items-center justify-content-between p-3">
-          <div class="d-flex align-items-center">
-            <i class="bi bi-collection me-2"></i>
-            <span>Your Library</span>
-          </div>
-          <div>
-            <button class="btn btn-link text-white p-1"><i class="bi bi-plus"></i></button>
-            <button class="btn btn-link text-white p-1"><i class="bi bi-arrow-right"></i></button>
-          </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="text-muted mb-0">YOUR LIBRARY</h6>
+          <button 
+            @click="createPlaylist" 
+            class="btn btn-link text-white p-0"
+            :disabled="!isConnected"
+          >
+            <i class="bi bi-plus-lg"></i>
+          </button>
         </div>
-
+        
         <!-- Playlists -->
-        <div class="playlists-container p-2">
-          <div v-if="!user" class="playlist-cta p-3 rounded-3 bg-dark-subtle mb-3">
-            <h6 class="mb-2">Create your first playlist</h6>
-            <p class="text-muted small mb-2">It's easy, we'll help you</p>
-            <button class="btn btn-light btn-sm rounded-pill">Create playlist</button>
+        <div class="playlists">
+          <div v-if="isLoading" class="text-center py-3">
+            <div class="spinner-border spinner-border-sm text-light" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
           </div>
-
-          <!-- Playlist Items -->
-          <div class="playlist-item p-2 rounded-2 hover-bg-dark" v-for="playlist in playlists" :key="playlist.id">
-            <div class="d-flex align-items-center">
-              <img :src="playlist.imageUrl" class="rounded-2 me-3" width="48" height="48" :alt="playlist.name">
-              <div>
-                <div class="playlist-name">{{ playlist.name }}</div>
-                <div class="text-muted small">Playlist • {{ playlist.owner }}</div>
-              </div>
+          <div v-else-if="!isConnected" class="text-center py-3">
+            <p class="text-muted small mb-2">Connect to Spotify to see your playlists</p>
+            <button @click="connectSpotify" class="btn btn-sm btn-success">
+              <i class="bi bi-spotify me-2"></i>Connect
+            </button>
+          </div>
+          <div v-else>
+            <div v-for="playlist in userPlaylists" :key="playlist.id" class="playlist-item">
+              <NuxtLink 
+                :to="`/playlist/${playlist.id}`" 
+                class="d-flex align-items-center text-white text-decoration-none py-2 px-3 rounded"
+                :class="{ 'active': route.path === `/playlist/${playlist.id}` }"
+              >
+                <img 
+                  :src="playlist.images?.[0]?.url || '/img/placeholder-playlist.png'" 
+                  :alt="playlist.name"
+                  class="playlist-cover me-3"
+                >
+                <div class="flex-grow-1">
+                  <div class="text-truncate">{{ playlist.name }}</div>
+                  <div class="text-muted small text-truncate">
+                    {{ playlist.tracks.total }} tracks
+                  </div>
+                </div>
+              </NuxtLink>
             </div>
           </div>
         </div>
@@ -165,22 +181,42 @@
           </div>
 
           <!-- Player Controls -->
-          <div class="player-controls text-center" style="width: 40%">
-            <div class="d-flex justify-content-center align-items-center gap-3 mb-2">
-              <button class="btn btn-link text-white"><i class="bi bi-shuffle"></i></button>
-              <button @click="previousTrack" class="btn btn-link text-white">
-                <i class="bi bi-skip-start-fill"></i>
-              </button>
-              <button @click="togglePlay" class="btn btn-link text-white rounded-circle play-button">
-                <i :class="isPlaying ? 'bi bi-pause-fill' : 'bi bi-play-fill'" class="fs-4"></i>
-              </button>
-              <button @click="nextTrack" class="btn btn-link text-white">
-                <i class="bi bi-skip-end-fill"></i>
-              </button>
-              <button class="btn btn-link text-white"><i class="bi bi-repeat"></i></button>
-            </div>
-            <div class="progress" style="height: 4px">
-              <div class="progress-bar bg-white" role="progressbar" style="width: 25%"></div>
+          <div class="player-controls d-flex align-items-center gap-3">
+            <button 
+              @click="previousTrack" 
+              class="btn btn-link text-white p-0"
+              :disabled="!isSpotifyConnected"
+            >
+              <i class="bi bi-skip-start-fill fs-4"></i>
+            </button>
+            
+            <button 
+              @click="togglePlay" 
+              class="btn btn-link text-white p-0"
+              :disabled="!isSpotifyConnected"
+            >
+              <i :class="isPlaying ? 'bi bi-pause-fill' : 'bi bi-play-fill'" class="fs-4"></i>
+            </button>
+            
+            <button 
+              @click="nextTrack" 
+              class="btn btn-link text-white p-0"
+              :disabled="!isSpotifyConnected"
+            >
+              <i class="bi bi-skip-end-fill fs-4"></i>
+            </button>
+            
+            <div class="volume-control d-flex align-items-center gap-2">
+              <i class="bi bi-volume-down text-white"></i>
+              <input 
+                type="range" 
+                class="form-range" 
+                min="0" 
+                max="100" 
+                v-model="volume"
+                @input="updateVolume"
+              >
+              <i class="bi bi-volume-up text-white"></i>
             </div>
           </div>
 
@@ -210,63 +246,112 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '~/composables/useAuth'
 import { useSpotify } from '~/composables/useSpotify'
 import { useSpotifyPlayer } from '~/composables/useSpotifyPlayer'
 
+interface SpotifyPlaylist {
+  id: string
+  name: string
+  description: string | null
+  images: { url: string }[]
+  tracks: {
+    total: number
+  }
+  owner: {
+    display_name: string
+  }
+}
+
+const router = useRouter()
+const route = useRoute()
 const { user, isAuthenticated, logout } = useAuth()
-const { isConnected, isInitialized, login: spotifyLogin } = useSpotify()
+const { 
+  getUserPlaylists, 
+  createPlaylist: spotifyCreatePlaylist,
+  login,
+  isConnected,
+  isInitialized
+} = useSpotify()
 const { 
   currentTrack, 
   isPlaying, 
   togglePlay, 
-  previousTrack,
   nextTrack,
+  previousTrack,
   setVolume
 } = useSpotifyPlayer()
 
-const router = useRouter()
-const volume = ref(50)
-
 const isSpotifyConnected = computed(() => isInitialized.value && isConnected.value)
 
-// Mock playlists data
-const playlists = ref([
-  {
-    id: '1',
-    name: 'Liked Songs',
-    owner: 'You',
-    imageUrl: 'https://misc.scdn.co/liked-songs/liked-songs-640.png'
-  },
-  {
-    id: '2',
-    name: 'Your Top Songs 2023',
-    owner: 'Spotify',
-    imageUrl: 'https://wrapped-images.spotifycdn.com/image/yts-2023/default/your-top-songs-2023_default_en.jpg'
-  }
-])
+const isLoading = ref(true)
+const userPlaylists = ref<SpotifyPlaylist[]>([])
+const volume = ref(50)
 
-const login = async () => {
+// Load playlists
+const loadPlaylists = async () => {
+  if (!isConnected.value) return
+  
   try {
-    // Navigate to login page instead of direct Google login
-    navigateTo('/login')
+    isLoading.value = true
+    const playlists = await getUserPlaylists()
+    userPlaylists.value = playlists
   } catch (error) {
-    console.error('Login error:', error)
+    console.error('Error loading playlists:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Create new playlist
+const createPlaylist = async () => {
+  if (!isConnected.value) return
+  
+  try {
+    const name = prompt('Enter playlist name:')
+    if (!name) return
+    
+    const description = prompt('Enter playlist description (optional):') || undefined
+    
+    const playlist = await spotifyCreatePlaylist(name, description)
+    if (playlist) {
+      // Reload playlists
+      await loadPlaylists()
+      // Navigate to the new playlist
+      router.push(`/playlist/${playlist.id}`)
+    }
+  } catch (error) {
+    console.error('Error creating playlist:', error)
+    alert('Failed to create playlist. Please try again.')
   }
 }
 
 // Connect to Spotify
-const connectToSpotify = () => {
-  spotifyLogin()
+const connectSpotify = () => {
+  login()
 }
+
+// Watch for connection changes
+watch(isConnected, (newValue) => {
+  if (newValue) {
+    loadPlaylists()
+  }
+})
+
+// Load playlists on mount if connected
+onMounted(async () => {
+  if (isConnected.value) {
+    await loadPlaylists()
+  }
+})
 
 // Handle logout
 const handleLogout = async () => {
   try {
     await logout()
-    router.push('/')
+    router.push('/login')
   } catch (error) {
     console.error('Logout error:', error)
   }
@@ -362,7 +447,18 @@ const updateVolume = () => {
 }
 
 .playlist-item:hover {
-  background-color: #282828;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.playlist-item.active {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.playlist-cover {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
 }
 
 .hover-bg-dark:hover {

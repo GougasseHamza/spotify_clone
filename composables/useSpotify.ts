@@ -136,9 +136,12 @@ export const useSpotify = () => {
       'user-top-read',
       'playlist-read-private',
       'playlist-read-collaborative',
+      'playlist-modify-public',
+      'playlist-modify-private',
+      'playlist-modify',
       'streaming',
       'user-library-read',
-      'user-library-modify'  // Add this for full library access
+      'user-library-modify'
     ].join(' ')
     
     const params = new URLSearchParams({
@@ -359,6 +362,28 @@ export const useSpotify = () => {
     })
   }
 
+  // Create a new playlist
+  const createPlaylist = async (name: string, description?: string) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        // Get current user's ID
+        const me = await spotifyApi.getMe()
+        const userId = me.body.id
+
+        // Create the playlist
+        const response = await spotifyApi.createPlaylist(name, {
+          description: description || undefined,
+          public: false
+        })
+
+        return response.body
+      } catch (error) {
+        console.error('Error creating playlist:', error)
+        throw error
+      }
+    })
+  }
+
   console.log('SpotifyWebApi initialized with redirect URI:', config.public.spotifyRedirectUri)
 
   return {
@@ -378,6 +403,7 @@ export const useSpotify = () => {
     getUserProfile,
     getUserPlaylists,
     getPlaylistTracks,
-    getLikedSongs
+    getLikedSongs,
+    createPlaylist
   }
 } 
