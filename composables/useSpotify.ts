@@ -276,6 +276,30 @@ export const useSpotify = () => {
     })
   }
 
+  const searchArtists = async (query: string) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        const response = await spotifyApi.searchArtists(query)
+        return response.body.artists?.items || []
+      } catch (error) {
+        console.error('Error searching artists:', error)
+        throw error
+      }
+    })
+  }
+
+  const getCategories = async () => {
+    return callWithTokenRefresh(async () => {
+      try {
+        const response = await spotifyApi.getCategories()
+        return response.body
+      } catch (error) {
+        console.error('Error getting categories:', error)
+        throw error
+      }
+    })
+  }
+
   // Log out from Spotify
   const logout = () => {
     if (process.client) {
@@ -384,6 +408,32 @@ export const useSpotify = () => {
     })
   }
 
+  // Get artist's top tracks
+  const getArtistTopTracks = async (artistId: string) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        const response = await spotifyApi.getArtistTopTracks(artistId, 'US')
+        return response.body.tracks
+      } catch (error) {
+        console.error('Error fetching artist top tracks:', error)
+        throw error
+      }
+    })
+  }
+
+  // Get artist details
+  const getArtist = async (artistId: string) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        const response = await spotifyApi.getArtist(artistId)
+        return response.body
+      } catch (error) {
+        console.error('Error fetching artist details:', error)
+        throw error
+      }
+    })
+  }
+
   console.log('SpotifyWebApi initialized with redirect URI:', config.public.spotifyRedirectUri)
 
   return {
@@ -397,6 +447,8 @@ export const useSpotify = () => {
     getMyTopArtists,
     getMyRecentlyPlayed,
     searchTracks,
+    searchArtists,
+    getCategories,
     spotifyApi,
     refreshAccessToken,
     play,
@@ -404,6 +456,8 @@ export const useSpotify = () => {
     getUserPlaylists,
     getPlaylistTracks,
     getLikedSongs,
-    createPlaylist
+    createPlaylist,
+    getArtistTopTracks,
+    getArtist
   }
 } 

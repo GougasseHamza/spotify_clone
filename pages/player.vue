@@ -1,108 +1,66 @@
 <template>
   <div class="player-page">
-    <div class="container">
-      <div class="row">
-        <div class="col-12 mb-4">
-          <h1>Now Playing</h1>
+    <div v-if="!isPlayerReady" class="loading-state">
+      <div v-if="playerError" class="error-message">
+        {{ playerError }}
+      </div>
+      <div v-else class="loading-message">
+        <div class="spinner"></div>
+        <p>Initializing player...</p>
+      </div>
+    </div>
+    
+    <div v-else class="player-content">
+      <div class="current-track">
+        <img 
+          :src="currentTrack?.album?.images[0]?.url || '/images/placeholder.png'" 
+          :alt="currentTrack?.name || 'No track playing'"
+          class="track-image"
+        />
+        <div class="track-info">
+          <h2>{{ currentTrack?.name || 'No track playing' }}</h2>
+          <p>{{ currentTrack?.artists?.map((artist: SpotifyArtist) => artist.name).join(', ') || 'No artist' }}</p>
         </div>
+      </div>
+
+      <div class="player-controls">
+        <button 
+          @click="previousTrack" 
+          class="control-button"
+          :disabled="!isPlayerReady"
+        >
+          <i class="fas fa-step-backward"></i>
+        </button>
         
-        <div v-if="!isConnected" class="col-12">
-          <div class="connect-spotify text-center p-5">
-            <h2 class="mb-4">Connect to Spotify</h2>
-            <p>To use the player, you need to connect your Spotify Premium account.</p>
-            <button @click="connectToSpotify" class="btn btn-lg btn-success rounded-pill mt-3">
-              <i class="bi bi-spotify me-2"></i> Connect to Spotify
-            </button>
-          </div>
-        </div>
+        <button 
+          @click="isPlaying ? pause() : play()" 
+          class="control-button play-button"
+          :disabled="!isPlayerReady"
+        >
+          <i :class="isPlaying ? 'fas fa-pause' : 'fas fa-play'"></i>
+        </button>
         
-        <div v-else-if="playerError" class="col-12">
-          <div class="alert alert-warning">
-            <h4><i class="bi bi-exclamation-triangle-fill me-2"></i> Player Error</h4>
-            <p>{{ playerError }}</p>
-            
-            <div v-if="playerError.includes('Premium')" class="mt-3">
-              <p>Spotify Web Playback SDK requires a Spotify Premium subscription.</p>
-              <a href="https://www.spotify.com/premium/" target="_blank" class="btn btn-outline-success">
-                Get Spotify Premium
-              </a>
-            </div>
-          </div>
-        </div>
-        
-        <div v-else class="col-12">
-          <!-- Player Loading State -->
-          <div v-if="!isPlayerReady" class="text-center p-5">
-            <div class="spinner-border text-success" role="status">
-              <span class="visually-hidden">Loading player...</span>
-            </div>
-            <p class="mt-3">Initializing Spotify player...</p>
-          </div>
-          
-          <!-- Full Player UI -->
-          <div v-else-if="currentTrack" class="player-container">
-            <div class="row">
-              <div class="col-md-4">
-                <div class="album-cover">
-                  <img 
-                    :src="currentTrack.album?.images?.[0]?.url || '/img/placeholder-album.png'" 
-                    :alt="currentTrack.album?.name"
-                    class="img-fluid rounded shadow"
-                  />
-                </div>
-              </div>
-              
-              <div class="col-md-8">
-                <div class="track-info">
-                  <h2 class="track-name">{{ currentTrack.name }}</h2>
-                  <h3 class="track-artist">{{ currentTrack.artists?.[0]?.name }}</h3>
-                  <p class="track-album text-muted">{{ currentTrack.album?.name }}</p>
-                  
-                  <div class="player-controls mt-5">
-                    <button @click="previousTrack" class="control-btn">
-                      <i class="bi bi-skip-backward-fill"></i>
-                    </button>
-                    <button @click="togglePlay" class="control-btn play-pause-btn">
-                      <i :class="isPlaying ? 'bi bi-pause-fill' : 'bi bi-play-fill'"></i>
-                    </button>
-                    <button @click="nextTrack" class="control-btn">
-                      <i class="bi bi-skip-forward-fill"></i>
-                    </button>
-                  </div>
-                  
-                  <div class="volume-control mt-4">
-                    <div class="d-flex align-items-center">
-                      <i class="bi bi-volume-down me-2"></i>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        v-model="volume" 
-                        @change="updateVolume"
-                        class="form-range"
-                      />
-                      <i class="bi bi-volume-up ms-2"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- No Track Playing State -->
-          <div v-else class="text-center p-5">
-            <h3>No Track Playing</h3>
-            <p>Play a track from your library or search results to see it here.</p>
-            <div class="mt-4">
-              <NuxtLink to="/search" class="btn btn-outline-success me-3">
-                <i class="bi bi-search me-2"></i> Search
-              </NuxtLink>
-              <NuxtLink to="/my-music" class="btn btn-outline-success">
-                <i class="bi bi-music-note-list me-2"></i> My Music
-              </NuxtLink>
-            </div>
-          </div>
-        </div>
+        <button 
+          @click="nextTrack" 
+          class="control-button"
+          :disabled="!isPlayerReady"
+        >
+          <i class="fas fa-step-forward"></i>
+        </button>
+      </div>
+
+      <div class="volume-control">
+        <i class="fas fa-volume-down"></i>
+        <input 
+          type="range" 
+          :value="volume"
+          min="0" 
+          max="1" 
+          step="0.01"
+          @input="(e) => setVolume(parseFloat((e.target as HTMLInputElement).value))"
+          :disabled="!isPlayerReady"
+        />
+        <i class="fas fa-volume-up"></i>
       </div>
     </div>
   </div>
@@ -113,147 +71,183 @@ import { ref, onMounted } from 'vue'
 import { useSpotify } from '~/composables/useSpotify'
 import { useSpotifyPlayer } from '~/composables/useSpotifyPlayer'
 
-definePageMeta({
-  middleware: ['auth']
-})
+interface SpotifyArtist {
+  id: string
+  name: string
+  type: string
+  uri: string
+}
 
-const { isConnected, login } = useSpotify()
-const {
-  isPlayerReady, 
-  isPlaying, 
-  currentTrack, 
+const spotifyApi = useSpotify()
+const { 
+  isPlayerReady,
   playerError,
-  togglePlay,
-  previousTrack,
+  currentTrack,
+  isPlaying,
+  play,
+  pause,
   nextTrack,
-  setVolume
+  previousTrack,
+  setVolume,
+  volume
 } = useSpotifyPlayer()
-
-const volume = ref(50)
-
-const updateVolume = () => {
-  setVolume(volume.value)
-}
-
-const connectToSpotify = () => {
-  login()
-}
-
-// Helper function to format track durations
-const formatDuration = (ms: number) => {
-  const minutes = Math.floor(ms / 60000)
-  const seconds = Math.floor((ms % 60000) / 1000)
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
-}
 </script>
 
 <style scoped>
 .player-page {
-  min-height: 80vh;
-  padding: 2rem 0;
-}
-
-.player-container {
-  background-color: #121212;
   padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-.album-cover {
-  margin-bottom: 2rem;
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
 }
 
-.album-cover img {
-  width: 100%;
-  max-width: 300px;
+.error-message {
+  color: #e74c3c;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.loading-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #1DB954;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.player-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.current-track {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  box-shadow: 0 4px 60px rgba(0, 0, 0, 0.5);
+}
+
+.track-image {
+  width: 120px;
+  height: 120px;
+  border-radius: 4px;
+  object-fit: cover;
 }
 
 .track-info {
-  margin-bottom: 2rem;
+  flex: 1;
 }
 
-.track-name {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-
-.track-artist {
+.track-info h2 {
   font-size: 1.5rem;
-  font-weight: 500;
   margin-bottom: 0.5rem;
-  color: #1DB954;
+  color: #fff;
 }
 
-.track-album {
-  font-size: 1rem;
+.track-info p {
+  color: #b3b3b3;
 }
 
 .player-controls {
   display: flex;
-  align-items: center;
   justify-content: center;
-  margin: 2rem 0;
+  align-items: center;
+  gap: 1rem;
 }
 
-.control-btn {
+.control-button {
   background: none;
   border: none;
-  color: white;
-  font-size: 2rem;
-  padding: 0.5rem;
-  margin: 0 1rem;
+  color: #fff;
+  font-size: 1.5rem;
   cursor: pointer;
-  transition: all 0.2s;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.2s ease;
 }
 
-.control-btn:hover {
-  color: #1DB954;
+.control-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
   transform: scale(1.1);
 }
 
-.play-pause-btn {
-  font-size: 3rem;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background-color: #1DB954;
-  color: black;
+.control-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.play-button {
+  font-size: 2rem;
+  background: #1DB954;
+  width: 60px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.play-pause-btn:hover {
-  background-color: #1ED760;
-  color: black;
+.play-button:hover:not(:disabled) {
+  background: #1ed760;
 }
 
-.form-range {
-  accent-color: #1DB954;
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
 }
 
-@media (max-width: 768px) {
-  .track-name {
-    font-size: 2rem;
-  }
-  
-  .track-artist {
-    font-size: 1.25rem;
-  }
-  
-  .control-btn {
-    font-size: 1.5rem;
-    margin: 0 0.5rem;
-  }
-  
-  .play-pause-btn {
-    font-size: 2rem;
-    width: 48px;
-    height: 48px;
-  }
+.volume-control input[type="range"] {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  background: #535353;
+  border-radius: 2px;
+  outline: none;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #1DB954;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.volume-control input[type="range"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.volume-control i {
+  color: #b3b3b3;
+  font-size: 1.2rem;
 }
 </style> 

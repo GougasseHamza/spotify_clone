@@ -81,16 +81,19 @@ export const useSpotifyPlayer = () => {
     player.value.addListener('initialization_error', ({ message }) => {
       console.error('Initialization error:', message)
       playerError.value = `Initialization error: ${message}`
+      isPlayerReady.value = false
     })
     
     player.value.addListener('authentication_error', ({ message }) => {
       console.error('Authentication error:', message)
       playerError.value = `Authentication error: ${message}`
+      isPlayerReady.value = false
     })
     
     player.value.addListener('account_error', ({ message }) => {
       console.error('Account error:', message)
       playerError.value = `Premium required: ${message}`
+      isPlayerReady.value = false
     })
     
     player.value.addListener('playback_error', ({ message }) => {
@@ -118,16 +121,30 @@ export const useSpotifyPlayer = () => {
       console.log('Ready with Device ID', device_id)
       deviceId.value = device_id
       isPlayerReady.value = true
+      playerError.value = null
     })
     
     // Not Ready
     player.value.addListener('not_ready', ({ device_id }) => {
       console.log('Device ID has gone offline', device_id)
       isPlayerReady.value = false
+      deviceId.value = null
     })
     
     // Connect to the player
-    player.value.connect()
+    player.value.connect().then(success => {
+      if (success) {
+        console.log('Successfully connected to Spotify player')
+      } else {
+        console.error('Failed to connect to Spotify player')
+        playerError.value = 'Failed to connect to player'
+        isPlayerReady.value = false
+      }
+    }).catch(error => {
+      console.error('Error connecting to Spotify player:', error)
+      playerError.value = 'Error connecting to player'
+      isPlayerReady.value = false
+    })
   }
   
   // Disconnect the player
@@ -219,10 +236,10 @@ export const useSpotifyPlayer = () => {
   
   // Set volume
   const setVolume = async (volumePercentage: number) => {
-    if (!player.value) return
+    if (!player.value || !isPlayerReady.value) return
     
     try {
-      await player.value.setVolume(volumePercentage / 100)
+      await player.value.setVolume(volumePercentage)
     } catch (error) {
       console.error('Error setting volume:', error)
       playerError.value = 'Error setting volume'
@@ -252,6 +269,35 @@ export const useSpotifyPlayer = () => {
       playerError.value = 'Error skipping to next track'
     }
   }
+  
+  // Play the current track
+  const play = async () => {
+    if (!player.value || !isPlayerReady.value) return
+    
+    try {
+      await player.value.togglePlay()
+      isPlaying.value = true
+    } catch (error) {
+      console.error('Error playing track:', error)
+      playerError.value = 'Error playing track'
+    }
+  }
+  
+  // Pause the current track
+  const pause = async () => {
+    if (!player.value || !isPlayerReady.value) return
+    
+    try {
+      await player.value.togglePlay()
+      isPlaying.value = false
+    } catch (error) {
+      console.error('Error pausing track:', error)
+      playerError.value = 'Error pausing track'
+    }
+  }
+  
+  // Volume control
+  const volume = ref(0.5)
   
   // Initialize the player when the component is mounted
   onMounted(async () => {
@@ -288,6 +334,7 @@ export const useSpotifyPlayer = () => {
       } catch (error) {
         console.error('Error initializing Spotify player:', error)
         playerError.value = 'Error initializing player'
+        isPlayerReady.value = false
       }
     }
   })
@@ -315,7 +362,10 @@ export const useSpotifyPlayer = () => {
     setVolume,
     previousTrack,
     nextTrack,
-    disconnect
+    disconnect,
+    play,
+    pause,
+    volume
   }
 }
 
@@ -391,4 +441,23 @@ declare namespace Spotify {
       name: string;
     }[];
   }
+}
+
+interface SpotifyArtist {
+  id: string
+  name: string
+  type: string
+  uri: string
+}
+
+interface SpotifyTrack {
+  id: string
+  name: string
+  artists: SpotifyArtist[]
+  album: {
+    name: string
+    images: { url: string }[]
+  }
+  duration_ms: number
+  uri: string
 } 

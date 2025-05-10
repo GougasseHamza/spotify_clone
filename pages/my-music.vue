@@ -152,18 +152,21 @@
       <div class="top-artists p-4">
         <h3 class="mb-4">Your Top Artists</h3>
         <div class="row g-4">
-          <div v-for="artist in topArtists" :key="artist.id" class="col-md-4 col-lg-3">
-            <div class="card bg-dark text-white h-100">
-              <img 
-                :src="artist.images?.[0]?.url || '/img/placeholder-artist.png'" 
-                class="card-img-top" 
-                :alt="artist.name"
-              >
-              <div class="card-body">
-                <h5 class="card-title">{{ artist.name }}</h5>
-                <p class="card-text text-muted small">{{ artist.genres?.join(', ') }}</p>
+          <div v-for="artist in topArtists" :key="artist.id" class="col-6 col-md-4 col-lg-3">
+            <NuxtLink :to="`/artist/${artist.id}`" class="text-decoration-none">
+              <div class="card bg-dark text-white h-100">
+                <img 
+                  :src="artist.images[0]?.url" 
+                  :alt="artist.name"
+                  class="card-img-top"
+                  style="aspect-ratio: 1; object-fit: cover;"
+                >
+                <div class="card-body">
+                  <h5 class="card-title text-truncate">{{ artist.name }}</h5>
+                  <p class="card-text text-muted">Artist</p>
+                </div>
               </div>
-            </div>
+            </NuxtLink>
           </div>
         </div>
       </div>
