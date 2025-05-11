@@ -168,9 +168,16 @@
                 <div class="track-name">{{ currentTrack.name }}</div>
                 <div class="artist-name text-muted small">{{ currentTrack.artists?.[0]?.name }}</div>
               </div>
-              <button class="btn btn-link text-white ms-3">
-                <i class="bi bi-heart"></i>
-              </button>
+              <div class="d-flex align-items-center">
+                <button class="btn btn-link text-white ms-3">
+                  <i class="bi bi-heart"></i>
+                </button>
+                <AddToPlaylistMenu 
+                  :track-uri="currentTrack.uri" 
+                  :track-name="currentTrack.name"
+                  class="ms-2"
+                />
+              </div>
             </div>
             <div v-else class="d-flex align-items-center">
               <div class="text-muted small">Not playing</div>
@@ -242,15 +249,29 @@
         </div>
       </footer>
     </main>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useHead } from '#app'
 import { useAuth } from '~/composables/useAuth'
 import { useSpotify } from '~/composables/useSpotify'
 import { useSpotifyPlayer } from '~/composables/useSpotifyPlayer'
+import AddToPlaylistMenu from '~/components/AddToPlaylistMenu.vue'
+
+// Add Bootstrap JS to head instead of in template
+useHead({
+  script: [
+    {
+      src: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js',
+      integrity: 'sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL',
+      crossorigin: 'anonymous'
+    }
+  ]
+})
 
 interface SpotifyPlaylist {
   id: string

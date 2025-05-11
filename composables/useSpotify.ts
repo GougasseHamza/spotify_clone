@@ -447,31 +447,85 @@ export const useSpotify = () => {
     })
   }
 
+  // Add track to playlist
+  const addTrackToPlaylist = async (playlistId: string, trackUris: string[]) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        const response = await spotifyApi.addTracksToPlaylist(playlistId, trackUris)
+        return response.body
+      } catch (error) {
+        console.error('Error adding tracks to playlist:', error)
+        throw error
+      }
+    })
+  }
+
+  // Get a playlist by ID
+  const getPlaylist = async (playlistId: string) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        const response = await spotifyApi.getPlaylist(playlistId)
+        return response.body
+      } catch (error) {
+        console.error('Error fetching playlist:', error)
+        throw error
+      }
+    })
+  }
+
+  // Remove tracks from a playlist
+  const removeTracksFromPlaylist = async (playlistId: string, trackUris: string[]) => {
+    return callWithTokenRefresh(async () => {
+      try {
+        // Convert track URIs to objects with uri property
+        const tracks = trackUris.map(uri => ({ uri }))
+        const response = await spotifyApi.removeTracksFromPlaylist(playlistId, tracks)
+        return response.body
+      } catch (error) {
+        console.error('Error removing tracks from playlist:', error)
+        throw error
+      }
+    })
+  }
+
+  // Get access token
+  const getAccessToken = () => {
+    if (process.client) {
+      return spotifyApi.getAccessToken()
+    }
+    return null
+  }
+
   console.log('SpotifyWebApi initialized with redirect URI:', config.public.spotifyRedirectUri)
 
+  // Return all functions and state
   return {
+    spotifyApi,
+    isInitialized,
+    isConnected,
+    hasToken,
     login,
     logout,
-    handleCallback,
-    isInitialized,
-    hasToken,
-    isConnected,
-    getFeaturedPlaylists,
-    getMyTopArtists,
-    getMyRecentlyPlayed,
-    searchTracks,
-    searchArtists,
-    getCategories,
-    spotifyApi,
     refreshAccessToken,
-    play,
+    getAccessToken,
     getUserProfile,
     getUserPlaylists,
     getPlaylistTracks,
+    getPlaylist,
     getLikedSongs,
+    searchTracks,
+    searchArtists,
+    getCategories,
+    play,
     createPlaylist,
     getArtistTopTracks,
     getArtist,
-    transferMyPlayback
+    transferMyPlayback,
+    addTrackToPlaylist,
+    removeTracksFromPlaylist,
+    handleCallback,
+    getFeaturedPlaylists,
+    getMyTopArtists,
+    getMyRecentlyPlayed
   }
 } 
