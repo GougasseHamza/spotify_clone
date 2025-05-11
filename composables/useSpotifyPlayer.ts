@@ -350,10 +350,18 @@ export const useSpotifyPlayer = () => {
   // Set volume
   const setVolume = async (volumePercentage: number) => {
     if (!player.value || !isPlayerReady.value) return
-    
+
     try {
-      volume.value = volumePercentage;
-      await player.value.setVolume(volumePercentage)
+      // Store the volume for future reference
+      volume.value = volumePercentage / 100; // Convert 0-100 scale to 0-1
+      
+      // Wait for any pending operations to complete
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Spotify Web Playback SDK expects 0-1 scale for volume
+      await player.value.setVolume(volumePercentage / 100);
+      
+      console.log(`[SpotifyPlayer] Volume set to ${volumePercentage}%`);
     } catch (error) {
       console.error('Error setting volume:', error)
       playerError.value = 'Error setting volume'

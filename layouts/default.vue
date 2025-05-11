@@ -39,7 +39,7 @@
           <h6 class="mb-0">Connect to Spotify</h6>
         </div>
         <p class="text-muted small mb-2">Connect to see your playlists and listen to music</p>
-        <button @click="connectToSpotify" class="btn btn-success btn-sm rounded-pill w-100">
+        <button @click="connectSpotify" class="btn btn-success btn-sm rounded-pill w-100">
           <i class="bi bi-spotify me-2"></i> Connect
         </button>
       </div>
@@ -213,8 +213,8 @@
                 class="form-range" 
                 min="0" 
                 max="100" 
-                v-model="volume"
-                @input="updateVolume"
+                :value="volume"
+                @change="updateVolume"
               >
               <i class="bi bi-volume-up text-white"></i>
             </div>
@@ -231,7 +231,7 @@
                 class="form-range" 
                 min="0" 
                 max="100" 
-                v-model="volume" 
+                :value="volume" 
                 @change="updateVolume"
               >
             </div>
@@ -364,9 +364,19 @@ const handleTrackSelect = (track: any) => {
 }
 
 // Update volume
-const updateVolume = () => {
-  setVolume(volume.value)
+const updateVolume = (event: Event) => {
+  const value = parseInt((event.target as HTMLInputElement).value)
+  if (!isNaN(value)) {
+    volume.value = value
+    // Debounce volume changes to prevent rapid calls
+    clearTimeout(volumeTimeout)
+    volumeTimeout = setTimeout(() => {
+      setVolume(value)
+    }, 100)
+  }
 }
+
+let volumeTimeout: NodeJS.Timeout
 </script>
 
 <style scoped>
