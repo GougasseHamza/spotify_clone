@@ -1,16 +1,19 @@
 import { ref, shallowRef, onMounted, onUnmounted } from 'vue'
 import { useSpotify } from './useSpotify'
 
+// Create global persistent state to maintain player across page navigations
+const player = shallowRef<Spotify.Player | null>(null)
+const deviceId = ref<string | null>(null)
+const isPlayerReady = ref(false)
+const isPlaying = ref(false)
+const currentTrack = ref<any>(null)
+const playerState = ref<Spotify.PlaybackState | null>(null)
+const playerError = ref<string | null>(null)
+const volume = ref(0.5)
+const isInitialized = ref(false)
+
 export const useSpotifyPlayer = () => {
   const { isConnected, spotifyApi, refreshAccessToken } = useSpotify()
-  
-  const player = shallowRef<Spotify.Player | null>(null)
-  const deviceId = ref<string | null>(null)
-  const isPlayerReady = ref(false)
-  const isPlaying = ref(false)
-  const currentTrack = ref<any>(null)
-  const playerState = ref<Spotify.PlaybackState | null>(null)
-  const playerError = ref<string | null>(null)
   
   // Load the Spotify Web Playback SDK Script
   const loadSpotifyScript = () => {
@@ -35,6 +38,12 @@ export const useSpotifyPlayer = () => {
   
   // Initialize the player
   const initializePlayer = () => {
+    // If already initialized, don't do it again
+    if (isInitialized.value) {
+      console.log('[SpotifyPlayer] Player already initialized, skipping')
+      return
+    }
+
     console.log('[SpotifyPlayer] initializePlayer called')
     if (!window.Spotify) {
       console.error('[SpotifyPlayer] Spotify SDK not loaded')
@@ -71,7 +80,7 @@ export const useSpotifyPlayer = () => {
         }
         cb(token || '')
       },
-      volume: 0.5
+      volume: volume.value
     })
     
     // Error handling
@@ -128,6 +137,7 @@ export const useSpotifyPlayer = () => {
       const success = await setActiveDevice()
       if (success) {
         isPlayerReady.value = true
+        isInitialized.value = true
         playerError.value = null
         
         // Initialize playback state
@@ -179,6 +189,7 @@ export const useSpotifyPlayer = () => {
       player.value.disconnect()
       isPlayerReady.value = false
       deviceId.value = null
+      isInitialized.value = false
     }
   }
   
@@ -341,6 +352,7 @@ export const useSpotifyPlayer = () => {
     if (!player.value || !isPlayerReady.value) return
     
     try {
+      volume.value = volumePercentage;
       await player.value.setVolume(volumePercentage)
     } catch (error) {
       console.error('Error setting volume:', error)
@@ -391,56 +403,6 @@ export const useSpotifyPlayer = () => {
       playerError.value = 'Error pausing track'
     }
   }
-  
-  // Volume control
-  const volume = ref(0.5)
-  
-  // Initialize the player when the component is mounted
-  onMounted(async () => {
-    if (process.client) {
-      try {
-        // Wait for Spotify API to be initialized and connected
-        if (!isConnected.value) {
-          console.log('Waiting for Spotify connection before initializing player...')
-          // Check every 1 second up to 10 times if we're connected
-          for (let i = 0; i < 10; i++) {
-            await new Promise(resolve => setTimeout(resolve, 1000))
-            if (isConnected.value) break
-          }
-        }
-        
-        // Only proceed if we're connected
-        if (!isConnected.value) {
-          console.warn('Not connected to Spotify, not initializing player')
-          return
-        }
-        
-        await loadSpotifyScript()
-        
-        // Wait for the Spotify SDK to load
-        window.onSpotifyWebPlaybackSDKReady = () => {
-          console.log('Spotify Web Playback SDK is ready')
-          initializePlayer()
-        }
-        
-        // If the callback didn't fire, but the SDK is already loaded, initialize anyway
-        if (window.Spotify) {
-          initializePlayer()
-        }
-      } catch (error) {
-        console.error('Error initializing Spotify player:', error)
-        playerError.value = 'Error initializing player'
-        isPlayerReady.value = false
-      }
-    }
-  })
-  
-  // Disconnect player when the component is unmounted
-  onUnmounted(() => {
-    if (player.value) {
-      disconnect()
-    }
-  })
   
   // Previous track
   const previousTrack = async () => {
@@ -507,6 +469,65 @@ export const useSpotifyPlayer = () => {
       playerError.value = 'Error skipping to next track'
     }
   }
+
+  // Force re-initialization if needed
+  const forceInitialize = async () => {
+    if (!isPlayerReady.value && !isInitialized.value) {
+      await loadSpotifyScript();
+      if (window.Spotify) {
+        initializePlayer();
+      }
+    }
+  }
+  
+  // Initialize the player when the component is mounted
+  onMounted(async () => {
+    if (process.client) {
+      try {
+        // If player is already initialized, skip initialization
+        if (isInitialized.value) {
+          console.log('[SpotifyPlayer] Player already initialized, skipping')
+          return
+        }
+
+        // Wait for Spotify API to be initialized and connected
+        if (!isConnected.value) {
+          console.log('Waiting for Spotify connection before initializing player...')
+          // Check every 1 second up to 10 times if we're connected
+          for (let i = 0; i < 10; i++) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            if (isConnected.value) break
+          }
+        }
+        
+        // Only proceed if we're connected
+        if (!isConnected.value) {
+          console.warn('Not connected to Spotify, not initializing player')
+          return
+        }
+        
+        await loadSpotifyScript()
+        
+        // Wait for the Spotify SDK to load
+        window.onSpotifyWebPlaybackSDKReady = () => {
+          console.log('Spotify Web Playback SDK is ready')
+          initializePlayer()
+        }
+        
+        // If the callback didn't fire, but the SDK is already loaded, initialize anyway
+        if (window.Spotify) {
+          initializePlayer()
+        }
+      } catch (error) {
+        console.error('Error initializing Spotify player:', error)
+        playerError.value = 'Error initializing player'
+        isPlayerReady.value = false
+      }
+    }
+  })
+  
+  // No longer disconnect player when unmounted - this is the key change!
+  // Only disconnect when explicitly called or app is closed
   
   return {
     player,
@@ -528,7 +549,8 @@ export const useSpotifyPlayer = () => {
     play,
     pause,
     volume,
-    setActiveDevice
+    setActiveDevice,
+    forceInitialize
   }
 }
 
